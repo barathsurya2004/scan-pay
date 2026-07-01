@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0e1116" />
+<title>ScanPay</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --ink: #0e1116;
+    --ink-soft: #161b22;
+    --line: #232a33;
+    --text: #e8edf2;
+    --muted: #8b96a3;
+    --gold: #f2b134;
+    --gold-deep: #c98a12;
+    --green: #2ecc71;
+    --red: #ff5d5d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .app {
+    width: 100%;
+    max-width: 460px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 20px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  /* header */
+  .top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .logo {
+    font-weight: 800; font-size: 26px; letter-spacing: -0.5px;
+  }
+  .logo b { color: var(--gold); }
+  .tag { color: var(--muted); font-size: 13px; }
+
+  /* coin signature */
+  .coin {
+    margin: 26px auto 18px;
+    width: 92px; height: 92px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 32% 28%, #ffd66b 0%, var(--gold) 42%, var(--gold-deep) 100%);
+    box-shadow: 0 10px 30px rgba(242,177,52,.28), inset 0 -6px 14px rgba(0,0,0,.25);
+    display: grid; place-items: center;
+    position: relative;
+  }
+  .coin::after {
+    content: "₹"; font-size: 40px; font-weight: 800; color: #4a3404;
+  }
+  .coin.scanning { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 10px 30px rgba(242,177,52,.28), inset 0 -6px 14px rgba(0,0,0,.25); }
+    50% { box-shadow: 0 10px 40px rgba(242,177,52,.55), inset 0 -6px 14px rgba(0,0,0,.25); }
+  }
+
+  h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+
+  /* scanner */
+  #reader {
+    width: 100%; border-radius: 18px; overflow: hidden;
+    border: 1px solid var(--line); background: #000; aspect-ratio: 1/1;
+  }
+  #reader video { object-fit: cover !important; }
+
+  .card {
+    background: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 18px; padding: 18px;
+  }
+  .merchant { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, var(--gold), var(--gold-deep));
+    display: grid; place-items: center; font-weight: 800; color: #3a2900; font-size: 18px;
+  }
+  .merchant .name { font-weight: 700; font-size: 16px; }
+  .merchant .vpa { color: var(--muted); font-size: 12px; word-break: break-all; }
+
+  .amt-wrap { text-align: center; margin: 22px 0 6px; }
+  .amt-line {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-bottom: 2px solid var(--line); padding-bottom: 6px;
+  }
+  .amt-line .rs { font-size: 30px; color: var(--muted); }
+  #amount {
+    background: transparent; border: none; outline: none; color: var(--text);
+    font-size: 44px; font-weight: 800; width: 5.5ch; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  #amount::placeholder { color: var(--line); }
+
+  .note-in {
+    width: 100%; margin-top: 14px; background: var(--ink); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    font-size: 14px; outline: none;
+  }
+  .note-in:focus { border-color: var(--gold-deep); }
+
+  .btn {
+    width: 100%; border: none; border-radius: 14px; padding: 16px;
+    font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 14px;
+    transition: transform .06s ease, opacity .2s;
+  }
+  .btn:active { transform: scale(.985); }
+  .btn-gold { background: linear-gradient(135deg, #ffd66b, var(--gold)); color: #3a2900; }
+  .btn-gold:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+
+  .or { text-align: center; color: var(--muted); font-size: 12px; margin: 18px 0; }
+  .manual { display: flex; gap: 8px; margin-top: 8px; }
+  .manual input {
+    flex: 1; background: var(--ink-soft); border: 1px solid var(--line);
+    border-radius: 12px; padding: 13px; color: var(--text); outline: none; font-size: 14px;
+  }
+  .manual input:focus { border-color: var(--gold-deep); }
+  .manual button {
+    background: var(--ink-soft); border: 1px solid var(--line); border-radius: 12px;
+    color: var(--gold); font-weight: 700; padding: 0 16px; cursor: pointer;
+  }
+
+  .hint { color: var(--muted); font-size: 11.5px; line-height: 1.5; margin-top: 14px; text-align: center; }
+  .err { color: var(--red); font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
+  .hidden { display: none !important; }
+  .footer { margin-top: auto; padding-top: 20px; color: var(--muted); font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo">Scan<b>Pay</b></div>
+    <div class="tag">scan · enter · pay</div>
+  </div>
+
+  <div class="coin" id="coin"></div>
+
+  <!-- STEP 1: scan -->
+  <section id="scanView">
+    <h2>Scan merchant QR</h2>
+    <div id="reader"></div>
+    <button class="btn btn-ghost" id="startBtn">Start camera</button>
+    <div class="or">— or pay any UPI ID —</div>
+    <div class="manual">
+      <input id="vpaInput" inputmode="email" placeholder="merchant@upi" autocomplete="off" />
+      <button id="vpaGo">Go</button>
+    </div>
+    <div class="err" id="scanErr"></div>
+  </section>
+
+  <!-- STEP 2: pay -->
+  <section id="payView" class="hidden">
+    <div class="card">
+      <div class="merchant">
+        <div class="avatar" id="mInitial">?</div>
+        <div>
+          <div class="name" id="mName">Merchant</div>
+          <div class="vpa" id="mVpa">—</div>
+        </div>
+      </div>
+
+      <div class="amt-wrap">
+        <div class="amt-line">
+          <span class="rs">₹</span>
+          <input id="amount" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0" />
+        </div>
+      </div>
+
+      <input class="note-in" id="note" placeholder="Add a note (optional)" maxlength="50" />
+      <button class="btn btn-gold" id="payBtn" disabled>Pay with GPay</button>
+      <button class="btn btn-ghost" id="resetBtn">Scan again</button>
+    </div>
+    <div class="hint" id="payHint"></div>
+    <div class="err" id="payErr"></div>
+  </section>
+
+  <div class="footer">You confirm the UPI PIN inside GPay. ScanPay never sees your money or PIN.</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- platform ----------
+  var ua = navigator.userAgent || "";
+  var isAndroid = /android/i.test(ua);
+  var isIOS = /iphone|ipad|ipod/i.test(ua) ||
+              (/Mac/i.test(ua) && navigator.maxTouchPoints > 1);
+
+  // ---------- state ----------
+  var merchant = { pa: "", pn: "", mc: "", extra: {} };
+  var qr = null, scanning = false;
+
+  // ---------- els ----------
+  var $ = function (id) { return document.getElementById(id); };
+  var scanView = $("scanView"), payView = $("payView"), coin = $("coin");
+  var amount = $("amount"), payBtn = $("payBtn");
+
+  // ---------- parse UPI URI ----------
+  function parseUpi(text) {
+    text = (text || "").trim();
+    // QR may be raw upi://pay?... or just a bare VPA
+    if (/^[\w.\-]+@[\w.\-]+$/.test(text)) {
+      return { pa: text, pn: "", mc: "", extra: {} };
+    }
+    if (!/^upi:\/\//i.test(text)) return null;
+    var q = text.split("?")[1] || "";
+    var p = new URLSearchParams(q);
+    var pa = p.get("pa");
+    if (!pa) return null;
+    var extra = {};
+    ["mc", "tid", "tr", "url", "mode", "purpose", "sign"].forEach(function (k) {
+      if (p.get(k)) extra[k] = p.get(k);
+    });
+    return {
+      pa: pa,
+      pn: p.get("pn") || "",
+      mc: p.get("mc") || "",
+      extra: extra
+    };
+  }
+
+  // ---------- build deep link ----------
+  function buildParams() {
+    var p = new URLSearchParams();
+    p.set("pa", merchant.pa);
+    p.set("pn", merchant.pn || "Merchant");
+    if (merchant.mc) p.set("mc", merchant.mc);
+    Object.keys(merchant.extra).forEach(function (k) {
+      if (k !== "mc") p.set(k, merchant.extra[k]);
+    });
+    p.set("am", Number(amount.value).toFixed(2));
+    p.set("cu", "INR");
+    var note = $("note").value.trim();
+    if (note) p.set("tn", note);
+    return p.toString();
+  }
+
+  // GPay package + iOS scheme
+  var GPAY_PKG = "com.google.android.apps.nbu.paisa.user";
+
+  function openGpay() {
+    var params = buildParams();
+
+    if (isAndroid) {
+      // direct to GPay app via Android intent
+      window.location.href =
+        "intent://pay?" + params +
+        "#Intent;scheme=upi;package=" + GPAY_PKG +
+        ";S.browser_fallback_url=" +
+        encodeURIComponent("https://play.google.com/store/apps/details?id=" + GPAY_PKG) +
+        ";end";
+      return;
+    }
+
+    if (isIOS) {
+      // Official modern scheme (Google iOS UPI docs): prepend gpay://
+      window.location.href = "gpay://upi/pay?" + params;
+      // Do NOT auto-redirect on a timer — the OS "Open in GPay?" prompt
+      // keeps JS timers running, so a timed jump would boot users who
+      // have the app installed straight to the App Store.
+      // Instead: if the page never goes to background, GPay didn't open.
+      var opened = false;
+      var onHide = function () { opened = true; };
+      document.addEventListener("visibilitychange", onHide, { once: true });
+      window.addEventListener("pagehide", onHide, { once: true });
+      setTimeout(function () {
+        document.removeEventListener("visibilitychange", onHide);
+        if (!opened && !document.hidden) {
+          $("payErr").innerHTML =
+            'GPay didn\u2019t open. <a href="https://apps.apple.com/app/' +
+            'google-pay/id1193357041" style="color:var(--gold);">Install it here</a>.';
+        }
+      }, 2500);
+      return;
+    }
+
+    // desktop / unknown: generic UPI (likely nothing to handle it)
+    $("payErr").textContent =
+      "Open this on an Android or iOS phone with GPay installed to pay.";
+    window.location.href = "upi://pay?" + params;
+  }
+
+  // ---------- show pay screen ----------
+  function showPay(m) {
+    merchant = m;
+    $("mName").textContent = m.pn || "Merchant";
+    $("mVpa").textContent = m.pa;
+    $("mInitial").textContent = (m.pn || m.pa || "?").charAt(0).toUpperCase();
+    scanView.classList.add("hidden");
+    payView.classList.remove("hidden");
+    coin.classList.remove("scanning");
+    $("payHint").textContent = isAndroid
+      ? "Opens GPay directly."
+      : isIOS
+        ? "Opens GPay. Switch back here manually after you pay."
+        : "Best on a phone with GPay.";
+    setTimeout(function () { amount.focus(); }, 150);
+  }
+
+  // ---------- camera scan ----------
+  function startScan() {
+    if (scanning) return;
+    $("scanErr").textContent = "";
+    qr = new Html5Qrcode("reader");
+    coin.classList.add("scanning");
+    qr.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      function (decoded) {
+        var m = parseUpi(decoded);
+        if (!m) return; // ignore non-UPI QR, keep scanning
+        stopScan();
+        showPay(m);
+      },
+      function () { /* per-frame fail: ignore */ }
+    ).then(function () {
+      scanning = true;
+      $("startBtn").textContent = "Stop camera";
+    }).catch(function (e) {
+      coin.classList.remove("scanning");
+      $("scanErr").textContent = "Camera blocked. Allow access, or use a UPI ID below.";
+    });
+  }
+
+  function stopScan() {
+    if (qr && scanning) {
+      qr.stop().then(function () { qr.clear(); }).catch(function () {});
+    }
+    scanning = false;
+    coin.classList.remove("scanning");
+    $("startBtn").textContent = "Start camera";
+  }
+
+  // ---------- events ----------
+  $("startBtn").addEventListener("click", function () {
+    scanning ? stopScan() : startScan();
+  });
+
+  $("vpaGo").addEventListener("click", function () {
+    var v = $("vpaInput").value.trim();
+    var m = parseUpi(v);
+    if (!m) { $("scanErr").textContent = "Enter a valid UPI ID like name@bank."; return; }
+    stopScan();
+    showPay(m);
+  });
+
+  amount.addEventListener("input", function () {
+    payBtn.disabled = !(Number(amount.value) > 0);
+  });
+
+  payBtn.addEventListener("click", function () {
+    if (!(Number(amount.value) > 0)) return;
+    $("payErr").textContent = "";
+    openGpay();
+  });
+
+  $("resetBtn").addEventListener("click", function () {
+    payView.classList.add("hidden");
+    scanView.classList.remove("hidden");
+    amount.value = ""; $("note").value = ""; payBtn.disabled = true;
+    $("payErr").textContent = "";
+  });
+})();
+</script>
+</body>
+</html>
